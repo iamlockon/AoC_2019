@@ -82,7 +82,7 @@ void part1(const Reactions &r) {
         else { // ex: 35 FEW
             const vector<string> formula = r[outPutToIdx[input[idx+1]]];
             if (stoi(input[idx]) < 0) {
-                if (excessiveOutput[input[idx+1]]) excessiveOutput[input[idx+1]] += stoi(input[idx]);
+                if (excessiveOutput.find(input[idx+1]) != excessiveOutput.end()) excessiveOutput[input[idx+1]] += stoi(input[idx]);
                 else excessiveOutput[input[idx+1]] = stoi(input[idx]);
                 const int unit_out = stoi(formula[formula.size() - 2]);
                 if (unit_out + excessiveOutput[input[idx+1]] > 0) {
@@ -102,7 +102,7 @@ void part1(const Reactions &r) {
     // reduce input to ORE unit.
     map<string, int> ingredients;
     for (int i = 0; i < input.size(); i += 2) {
-        if (ingredients[input[i+1]]) ingredients[input[i+1]] += stoi(input[i]);
+        if (ingredients.find(input[i+1]) != ingredients.end()) ingredients[input[i+1]] += stoi(input[i]);
         else ingredients[input[i+1]] = stoi(input[i]);
     }
     
