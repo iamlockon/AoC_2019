@@ -1,148 +1,116 @@
+/**
+ * Inspired by https://github.com/AKQuaternion/AdventOfCode2019/blob/master/day14.cpp
+ *
+ */
+
 #include <iostream>
 #include <string>
 #include <vector>
 #include <fstream>
 #include <sstream>
 #include <map>
+#include <set>
+#include <deque>
 using namespace std;
 
-typedef vector<vector<string>> Reactions;
+using Number = unsigned long long;
 
-void reduce(map<string, int> &ingre, const vector<string> formula, const string name) {
-    const int unit_output = stoi(formula[formula.size()-2]);
-    const int needed = ingre[name];
-    const int multiples = needed % unit_output > 0 ? needed / unit_output + 1 : needed / unit_output;
-    for (int i = 0; i < formula.size() - 2; i += 2) {
-        const int coefficient = stoi(formula[i]) * multiples;
-        ingre[formula[i+1]] += coefficient;
-    }
-    const int left_output = needed - unit_output * multiples;
-    if (left_output) ingre[name] -= left_output;
-}
+struct Ingredient {
+    string name;
+    Number amount;
+};
 
-void reduceInput(const vector<string> formula, vector<string> &input, int idx) {
-    const int unit_output = stoi(formula[formula.size()-2]);
-    const int needed = stoi(input[idx]);
-    const int multiples = needed % unit_output > 0 ? needed / unit_output + 1 : needed / unit_output;
-    for (int i = 0; i < formula.size() - 2; i += 2) {
-        const int coefficient = stoi(formula[i]) * multiples;
-        input.push_back(to_string(coefficient));
-        input.push_back(formula[i+1]);
-    }
-    const int left_output = unit_output * multiples - needed;
-    if (left_output) {
-        input.push_back(to_string(-left_output));
-        input.push_back(input[idx+1]);
-    }
-    input.erase(input.begin() + idx, input.begin() + idx + 2);
-}
+struct Reaction {
+    Number outAmount;
+    vector<Ingredient> ingredients;
+};
 
-int inverseOutput(const vector<string> formula, vector<string> &input, const int amount, int idx) {
-    const int unit_output = stoi(formula[formula.size()-2]);
-    const int left = amount;
-    const int multiples = left / unit_output;
-    for (int i = 0; i < formula.size() - 2; i += 2) {
-        const int coefficient = stoi(formula[i]) * multiples;
-        input.push_back(to_string(-coefficient));
-        input.push_back(formula[i+1]);
-    }
-    const int left_output = left - unit_output * multiples;
-    if (left_output) {
-        input.push_back(to_string(-left_output));
-        input.push_back(input[idx+1]);
-    }
-    input.erase(input.begin() + idx, input.begin() + idx + 2);
-    return left_output;
-}
+typedef map<string, Reaction> Reactions;
 
-void part1(const Reactions &r) {
-    // get map of "output to reaction vector idx"
-    map<string, int> outPutToIdx;
-    for (int i = 0; i < r.size(); i++) {
-        const string output = r[i][r[i].size()-1];
-        outPutToIdx.insert({output, i});
-    }
-    // find ore-equivalent output names.
-    map<string, bool> equalOre;
-    for (auto &re: r) {
-        if (re.size() == 4 && re[1] == "ORE") { // since only reactions look like "N ORE => M A" (length 4) is true
-            equalOre.insert({re[re.size()-1], true});
-        } else {
-            equalOre.insert({re[re.size()-1], false});
-        }
-    }    
-
-    vector<string> input = r[outPutToIdx["FUEL"]];
-    input.pop_back();
-    input.pop_back();
-    map<string, int> excessiveOutput;
-    int idx = 0;
-    while (idx+1 < input.size()) {
-        if(equalOre[input[idx+1]]) idx += 2;
-        else { // ex: 35 FEW
-            const vector<string> formula = r[outPutToIdx[input[idx+1]]];
-            if (stoi(input[idx]) < 0) {
-                if (excessiveOutput.find(input[idx+1]) != excessiveOutput.end()) excessiveOutput[input[idx+1]] += stoi(input[idx]);
-                else excessiveOutput[input[idx+1]] = stoi(input[idx]);
-                const int unit_out = stoi(formula[formula.size() - 2]);
-                if (unit_out + excessiveOutput[input[idx+1]] > 0) {
-                    idx += 2;
-                    continue;
-                }
-                const int amount = abs(excessiveOutput[input[idx+1]]);
-                const string key = input[idx+1];
-                const int left = inverseOutput(formula, input, amount, idx);
-                excessiveOutput[key] = -left;
-                continue;
-            }
-            reduceInput(formula, input, idx);
-        }
-    }
-
-    // reduce input to ORE unit.
-    map<string, int> ingredients;
-    for (int i = 0; i < input.size(); i += 2) {
-        if (ingredients.find(input[i+1]) != ingredients.end()) ingredients[input[i+1]] += stoi(input[i]);
-        else ingredients[input[i+1]] = stoi(input[i]);
-    }
-    
-    int res = 0;
-    for (auto &ingredient: ingredients) {
-        if (ingredient.second <= 0) continue;
-        const vector<string> formula = r[outPutToIdx[ingredient.first]];
-        const int unit_output = stoi(formula[formula.size()-2]);
-        const int unit_input = stoi(formula[0]);
-        const int multiples = ingredient.second % unit_output > 0 ?
-             ingredient.second / unit_output + 1 : ingredient.second / unit_output;
-        const int oreNeeded = unit_input * multiples;
-        res += oreNeeded;
-    }
-    cout << res << endl;
-}
-
-int main() {
-    ifstream fin("./d14/case.txt");
-    string line;
-    Reactions react;
+void readInput(ifstream &fin, Reactions &reactions) {
+    string s;
     stringstream ss;
-    while (getline(fin, line)) {
-        ss << line;
-        vector<string> v;
-        while(ss) {
-            string s;
-            ss >> s;
-            if (s == "=>") continue;
-            if (s.size() > 0) {
-                if (s.find(',') != string::npos) s = s.substr(0, s.find(',')); 
-                v.push_back(s);
-            }
-        }
-        react.push_back(v);
-        // clean-up
+    while (getline(fin, s)) {
+        Reaction r;
         ss.str("");
         ss.clear();
+        ss << s;
+        bool done = false;
+        Ingredient i{"", 0};
+        while (!done) {
+            ss >> i.amount >> i.name;
+            if (i.name.back() == ',') {
+                i.name.pop_back();
+            }
+            else {
+                done = true;
+            }
+            r.ingredients.push_back(i);
+        }
+        string arrow;
+        ss >> arrow >> i.amount >> i.name;
+        reactions[i.name] = {i.amount, r.ingredients};
     }
-    part1(react);
+}
 
+void topoHelper(const string &name, const Reactions &reactions, set<string> &visited, deque<string> &order) {
+    if (name == "ORE") return;
+    visited.insert(name);
+    for (const auto &ingredient: reactions.at(name).ingredients) {
+        const string _name = ingredient.name;
+        if (!visited.count(_name)) {
+            topoHelper(_name, reactions, visited, order);
+        }
+    }
+    order.push_front(name);
+}
+
+void topoSort(const string &name, const Reactions &reactions, deque<string> &order) {
+    set<string> visited;
+    topoHelper(name, reactions, visited, order);
+}
+
+void part12(const Reactions &reactions) {
+    // Get topological order array
+    deque<string> topoOrder;
+    topoSort("FUEL", reactions, topoOrder);
+    // reduce reactions to ore needed.
+
+    auto makeFuel = [&](Number needed) {
+        map<string, Number> amountNeeded{{"FUEL", needed}};
+        for (const auto &chemical: topoOrder) {
+            const auto &ingredients = reactions.at(chemical).ingredients;
+            for (const auto &reactant: ingredients) {
+                const Number timesToRun = amountNeeded[chemical] % reactions.at(chemical).outAmount > 0 ?
+                 amountNeeded[chemical] / reactions.at(chemical).outAmount + 1 : amountNeeded[chemical] / reactions.at(chemical).outAmount;
+                amountNeeded[reactant.name] += timesToRun * reactant.amount;
+            }
+        }
+        return amountNeeded["ORE"];
+    };
+    cout << makeFuel(1) << endl;
+
+    const Number TARGET = 1000000000000ull;
+    //binary search
+    Number lower = 0ull, upper = TARGET;
+    while (lower < upper) {
+        const Number mid = lower + (upper - lower) / 2;
+        const Number ores = makeFuel(mid);
+        if (ores < TARGET) {
+            lower = mid + 1;
+        }
+        else {
+            upper = mid - 1;
+        }
+    } 
+    cout << lower << endl;
+}
+
+
+int main() {
+    ifstream fin("./d14/input.txt");
+    Reactions reactions;
+    readInput(fin, reactions);
+    part12(reactions);
     return 0;
 }
