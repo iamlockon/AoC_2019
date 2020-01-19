@@ -69,6 +69,47 @@ void traverse(const Map &m, const Portals &portals, Point start, const Point &ra
     }
 }
 
+void recurTraverse(const Map &m, const Portals &portals, Point start, const Point &range) {
+    Point goal = portals.at("ZZ");
+    deque<pair<Point, array<int,2>>> queue; // pair::second store steps and level in an array
+    set<pair<Point, int>> visited; // use pair instead, pair:second stores level
+    visited.insert({start, 0});
+    queue.push_front({start, {0, 0}});
+    int steps = 0;
+    while (queue.size() != 0) {
+        auto p = queue.back().first;
+        auto point = queue.back();
+        const int level = point.second[1];
+        cout << level << endl;
+        visited.insert({p, level});
+        queue.pop_back();
+        array<Point, 4> neighbors = {{
+            {p[0], p[1]-1, 0, 0}, // left
+            {p[0], p[1]+1, 0, 0}, // right
+            {p[0]-1, p[1], 0, 0}, // up
+            {p[0]+1, p[1], 0, 0}  // down
+        }};
+        for (auto po: neighbors) {
+            if (po[0] > range[2] || po[0] < range[0] || po[1] > range[3] || po[1] < range[1]) continue;
+            if (!visited.count({po, level}) && m[po[0]].at(po[1]) == '.') { // process '.' only
+                auto res = isPortal(portals, po[0], po[1]);
+                if (res.first) { // if meets portals, see if it is goal with correct level; if so, return, otherwise transport directly.
+                    if (po == goal && level == 0) {
+                        cout << "Ans to part2: " << point.second[0] + 1 << endl;
+                        return;
+                    }
+                    visited.insert({po, level});
+                    const int delta = po[0] == range[0] || po[0] == range[2] || po[1] == range[1] || po[1] == range[3] ? -1 : +1;
+                    if (delta == -1 && level <= 0) continue;
+                    queue.push_front({res.second, array<int,2>({point.second[0]+2, level + delta})});
+                    continue;
+                }
+                if (m[po[0]].at(po[1]) == '.') queue.push_front({po, array<int,2>({point.second[0]+1, level})});
+            }
+        }
+    }
+}
+
 void solution(Portals p, Point r) {
     // Collect maze data
     ifstream fin("./d20/input.txt");
@@ -83,6 +124,7 @@ void solution(Portals p, Point r) {
     auto it = p.find("AA");
     auto pos = it->second;
     traverse(m, p, pos, r);
+    recurTraverse(m, p, pos, r);
 }
 
 int main() {
