@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 #include <set>
-#include <unordered_map>
+#include <map>
 #include <array>
 #include <bitset>
 #include <cmath>
@@ -86,22 +86,64 @@ void solution(Grid g) {
     };
 
     auto countAdj_r = [](const Grid &g, int i , int j) {
+        // rule: out of bound -> check in -1 level
+        //       encounter center -> check in +1 level
         int res = 0;
-        if (i - 1 > -1 && g[i-1][j] == '#') res++; 
-        if (j - 1 > -1 && g[i][j-1] == '#') res++; 
-        if (i + 1 < SLEN && g[i+1][j] == '#') res++; 
-        if (j + 1 < SLEN && g[i][j+1] == '#') res++; 
+        // TODO: check adj
+        // if (i - 1 > -1 && g[i-1][j] == '#') res++; 
+        // if (j - 1 > -1 && g[i][j-1] == '#') res++; 
+        // if (i + 1 < SLEN && g[i+1][j] == '#') res++; 
+        // if (j + 1 < SLEN && g[i][j+1] == '#') res++; 
         return res;
     };
+    auto createEmptyGrid = []() {
+        Grid d;
+        for (auto &a: d) {
+            for (auto &c: a) {
+                c = '.';
+            }
+        }
+        return d;
+    };
 
-    auto evolve_r = [&](unordered_map<int, Grid> &e) {
+    auto alterBoundary = [&](map<int,Grid> &e) {
+        const int i = e.begin()->first;
+        const int o = e.end()->first;
+        // check outward
+        auto &out = e.begin()->second;
+        int ctru = 0, ctrd = 0;
+        for (int m = 0; m < SLEN; m++) { 
+            if (out[0][m] == '#') ctru++;
+            if (out[SLEN-1][m] == '#') ctrd++;
+        } // up and down
+        int ctrl = 0, ctrr = 0;
+        for (int m = 0; m < SLEN; m++) { 
+            if (out[m][0] == '#') ctrl++;
+            if (out[m][SLEN-1] == '#') ctrr++;
+        } // left and right
+        if (ctru == 1 || ctru == 2 || ctrd == 1 || ctrd == 2
+            || ctrl == 1 || ctrl == 2 || ctrr == 1 || ctrr == 2) {
+            e.insert({o-1, createEmptyGrid()});
+        }  
+        // check inward
+        auto &in = e.end()->second;
+        if (in[SLEN / 2 - 1][SLEN / 2] == '#' || in[SLEN / 2 + 1][SLEN / 2] == '#'
+           || in[SLEN / 2][SLEN / 2 - 1] == '#' || in[SLEN / 2][SLEN / 2 + 1] == '#') {
+            e.insert({i+1, createEmptyGrid()});
+           }
+    };
+
+    auto evolve_r = [&](map<int, Grid> &e) {
         // bug -> empty unless exactly one bug adjecent
         // empty -> bug if one or two bug adjecent
-        unordered_map<int, int[]> willChange;
+        map<int, int[]> willChange;
+        alterBoundary(e); // increase level if conditions meet
         for (auto &[k, g]: e) {
             willChange.try_emplace(k, array<int,25>{});
             for (int i = 0; i < SLEN; i++) {
                 for (int j = 0; j < SLEN; j++) {
+                    // skip center
+                    if (i = SLEN / 2 && j == SLEN / 2) continue;
                     const int adj = countAdj_r(g, i, j);
                     if (g[i][j] == '#') {
                         if (adj != 1) willChange[k][i*5 + j] = 1;
@@ -116,13 +158,15 @@ void solution(Grid g) {
         for (auto &[k, g]: e) {
             for (int i = 0; i < SLEN; i++) {
                 for (int j = 0; j < SLEN; j++) {
+                    // skip center
+                    if (i = SLEN / 2 && j == SLEN / 2) continue;
                     if (willChange[k][5*i + j]) g[i][j] = g[i][j] == '#' ? '.' : '#';
                 }
             }
         }
     };
 
-    auto recEvolve = [&](unordered_map<int, Grid> e, int rep) {
+    auto recEvolve = [&](map<int, Grid> e, int rep) {
         for (int i = 0; i < rep; i++) {
             evolve_r(e);
         }
@@ -147,11 +191,12 @@ void solution(Grid g) {
     }
 
     // init eris (level to Grid)
-    unordered_map<int, Grid> eris; 
+    map<int, Grid> eris; 
     eris.insert({0, cp});
 
     {
-        int ans = recEvolve(eris, REP);
+        int ans;
+        auto last = recEvolve(eris, REP);
         cout << "Ans to part2 is : " << ans << endl;
     }
 }
