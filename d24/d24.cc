@@ -85,15 +85,51 @@ void solution(Grid g) {
         return res;
     };
 
-    auto countAdj_r = [](const Grid &g, int i , int j) {
+    auto countAdj_r = [](const Grid &g, const map<int, Grid> &e, int l, int i , int j) {
         // rule: out of bound -> check in -1 level
         //       encounter center -> check in +1 level
         int res = 0;
-        // TODO: check adj
-        // if (i - 1 > -1 && g[i-1][j] == '#') res++; 
-        // if (j - 1 > -1 && g[i][j-1] == '#') res++; 
-        // if (i + 1 < SLEN && g[i+1][j] == '#') res++; 
-        // if (j + 1 < SLEN && g[i][j+1] == '#') res++; 
+        // check same level tiles
+        if (i > 0 && g[i-1][j] == '#') res++; 
+        if (j > 0 && g[i][j-1] == '#') res++; 
+        if (i + 1 < SLEN && g[i+1][j] == '#') res++; 
+        if (j + 1 < SLEN && g[i][j+1] == '#') res++; 
+        // check different level tiles
+
+        // outer level
+        if (e.find(l-1) != e.end()) {
+            const auto &outGrid = e.at(l-1);
+            if (i == 0 && outGrid[1][2] == '#') res++;
+            if (i == SLEN-1 && outGrid[3][2] == '#') res++;
+            if (j == 0 && outGrid[2][1] == '#') res++;
+            if (j == SLEN-1 && outGrid[2][3] == '#') res++;
+        }
+
+        // inner level
+        if (e.find(l+1) != e.end()) {
+            const auto &inGrid = e.at(l+1);
+            if (i + 1 == 2 && j == 2) {
+                for (int m = 0; m < SLEN; m++) {
+                    if (inGrid[0][m] == '#') res++;
+                }
+            } 
+            if (i - 1 == 2 && j == 2) {
+                for (int m = 0; m < SLEN; m++) {
+                    if (inGrid[SLEN-1][m] == '#') res++;
+                }
+            }
+            if (i == 2 && j + 1 == 2) {
+                for (int m = 0; m < SLEN; m++) {
+                    if (inGrid[m][0] == '#') res++;
+                }
+            }
+            if (i == 2 && j - 1 == 2) {
+                for (int m = 0; m < SLEN; m++) {
+                    if (inGrid[m][SLEN-1] == '#') res++;
+                }
+            }
+        }
+        
         return res;
     };
     auto createEmptyGrid = []() {
@@ -107,20 +143,20 @@ void solution(Grid g) {
     };
 
     auto alterBoundary = [&](map<int,Grid> &e) {
-        const int i = e.begin()->first;
-        const int o = e.end()->first;
+        const int i = e.rbegin()->first;
+        const int o = e.begin()->first;
         // check outward
         auto &out = e.begin()->second;
         int ctru = 0, ctrd = 0;
-        for (int m = 0; m < SLEN; m++) { 
+        for (int m = 0; m < SLEN; m++) { // up and down
             if (out[0][m] == '#') ctru++;
             if (out[SLEN-1][m] == '#') ctrd++;
-        } // up and down
+        } 
         int ctrl = 0, ctrr = 0;
-        for (int m = 0; m < SLEN; m++) { 
+        for (int m = 0; m < SLEN; m++) { // left and right
             if (out[m][0] == '#') ctrl++;
             if (out[m][SLEN-1] == '#') ctrr++;
-        } // left and right
+        } 
         if (ctru == 1 || ctru == 2 || ctrd == 1 || ctrd == 2
             || ctrl == 1 || ctrl == 2 || ctrr == 1 || ctrr == 2) {
             e.insert({o-1, createEmptyGrid()});
@@ -136,15 +172,15 @@ void solution(Grid g) {
     auto evolve_r = [&](map<int, Grid> &e) {
         // bug -> empty unless exactly one bug adjecent
         // empty -> bug if one or two bug adjecent
-        map<int, int[]> willChange;
+        map<int, array<int, 25>> willChange;
         alterBoundary(e); // increase level if conditions meet
         for (auto &[k, g]: e) {
-            willChange.try_emplace(k, array<int,25>{});
+            willChange.insert({k, array<int,25>{}});
             for (int i = 0; i < SLEN; i++) {
                 for (int j = 0; j < SLEN; j++) {
                     // skip center
-                    if (i = SLEN / 2 && j == SLEN / 2) continue;
-                    const int adj = countAdj_r(g, i, j);
+                    if (i == SLEN / 2 && j == SLEN / 2) continue;
+                    const int adj = countAdj_r(g, e, k, i, j);
                     if (g[i][j] == '#') {
                         if (adj != 1) willChange[k][i*5 + j] = 1;
                     } else {
@@ -159,16 +195,31 @@ void solution(Grid g) {
             for (int i = 0; i < SLEN; i++) {
                 for (int j = 0; j < SLEN; j++) {
                     // skip center
-                    if (i = SLEN / 2 && j == SLEN / 2) continue;
+                    if (i == SLEN / 2 && j == SLEN / 2) continue;
                     if (willChange[k][5*i + j]) g[i][j] = g[i][j] == '#' ? '.' : '#';
                 }
             }
         }
     };
 
+    auto show = [&](const map<int, Grid> &e) {
+        for (const auto &[k, g]: e) {
+            cout << "Level " << k << ":" << endl;
+            for (const auto &m: g) {
+                for (const auto &c: m) {
+                    cout << c;
+                }
+                cout << endl;
+            }
+            cout << endl;
+        }
+        cout << "========================" << endl;
+    };
+
     auto recEvolve = [&](map<int, Grid> e, int rep) {
         for (int i = 0; i < rep; i++) {
             evolve_r(e);
+            // show(e);
         }
         return e;
     };
@@ -194,9 +245,23 @@ void solution(Grid g) {
     map<int, Grid> eris; 
     eris.insert({0, cp});
 
+    auto countBugs = [&](const map<int, Grid> &e) {
+        int res = 0;
+        for (const auto &[k,g]: e) {
+            for (const auto &m: g) {
+                for (const auto &c: m) {
+                    if (c == '#') res++;
+                }
+            }
+        }
+        return res;
+    };
+
     {
         int ans;
         auto last = recEvolve(eris, REP);
+        // show(last);
+        ans = countBugs(last);
         cout << "Ans to part2 is : " << ans << endl;
     }
 }
